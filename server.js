@@ -3,68 +3,49 @@ const multer = require('multer');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
-const path = require('path');
 const cors = require('cors');
 
 const app = express();
 const upload = multer({ 
     dest: 'uploads/',
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg') {
-            cb(null, true);
-        } else {
-            cb(new Error('Sirf JPEG/JPG files allow hain'), false);
-        }
-    }
+    limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// CORS - Sirf frontend domains allow karo
+// CORS setup
 app.use(cors({
-    origin: [
-        'https://stylopro.online',
-        'https://www.stylopro.online',
-        'http://localhost:3000'
-    ],
-    methods: ['GET', 'POST', 'OPTIONS'],
-    credentials: true
+    origin: ['https://stylopro.online', 'https://www.stylopro.online', 'http://localhost:3000'],
+    methods: ['GET', 'POST']
 }));
-
-app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Backend is running' });
+    res.json({ status: 'ok' });
 });
 
-// API key - Environment se lo
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '0cd767aa6fmshd08d25f930a1f1bp1e8607jsn9543f3437c3d';
-
+// Generate outfit endpoint
 app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => {
     try {
         const gender = req.body.gender || 'female';
         const prompt = req.body.prompt || '';
         
         if (!prompt) {
-            return res.status(400).send('Prompt nahi hai bhai!');
+            return res.status(400).send('Prompt required');
         }
         
         let finalPrompt = prompt;
         if (gender === 'male') {
-            finalPrompt = `man wearing ${finalPrompt}, masculine fit, men's fashion, photorealistic`;
+            finalPrompt = `man wearing ${finalPrompt}, men's fashion`;
         } else {
-            finalPrompt = `woman wearing ${finalPrompt}, feminine fit, women's fashion, photorealistic`;
+            finalPrompt = `woman wearing ${finalPrompt}, women's fashion`;
         }
-        
-        console.log('📝 Final Prompt:', finalPrompt);
         
         const form = new FormData();
         form.append('avatar_image', fs.createReadStream(req.file.path), {
             filename: req.file.originalname,
-            contentType: req.file.mimetype,
+            contentType: req.file.mimetype
         });
         form.append('clothing_prompt', finalPrompt);
         
@@ -75,10 +56,9 @@ app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => 
             headers: {
                 ...form.getHeaders(),
                 'x-rapidapi-host': 'try-on-diffusion.p.rapidapi.com',
-                'x-rapidapi-key': RAPIDAPI_KEY
+                'x-rapidapi-key': process.env.RAPIDAPI_KEY || '0cd767aa6fmshd08d25f930a1f1bp1e8607jsn9543f3437c3d'
             },
-            responseType: 'arraybuffer',
-            timeout: 30000
+            responseType: 'arraybuffer'
         });
         
         res.set('Content-Type', 'image/jpeg');
@@ -86,13 +66,12 @@ app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => 
         fs.unlink(req.file.path, () => {});
         
     } catch (error) {
-        console.error('❌ Error:', error.message);
-        res.status(500).send(error.response?.data || error.message);
+        console.error(error);
+        res.status(500).send(error.message);
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Backend running on port ${PORT}`);
-    console.log(`✅ CORS enabled for stylopro.online`);
+    console.log(`✅ Server running on port ${PORT}`);
 });
