@@ -6,12 +6,8 @@ const fs = require('fs');
 const cors = require('cors');
 
 const app = express();
-const upload = multer({ 
-    dest: 'uploads/',
-    limits: { fileSize: 5 * 1024 * 1024 }
-});
+const upload = multer({ dest: 'uploads/' });
 
-// CORS setup
 app.use(cors({
     origin: ['https://stylopro.online', 'https://www.stylopro.online', 'http://localhost:3000'],
     methods: ['GET', 'POST']
@@ -25,30 +21,34 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Generate outfit endpoint
+// ✅ YEH ROUTE IMPORTANT HAI - GENERATE OUTFIT
 app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => {
     try {
+        console.log('✅ Generate outfit called');
+        console.log('Body:', req.body);
+        console.log('File:', req.file);
+
         const gender = req.body.gender || 'female';
         const prompt = req.body.prompt || '';
-        
+
         if (!prompt) {
             return res.status(400).send('Prompt required');
         }
-        
+
         let finalPrompt = prompt;
         if (gender === 'male') {
             finalPrompt = `man wearing ${finalPrompt}, men's fashion`;
         } else {
             finalPrompt = `woman wearing ${finalPrompt}, women's fashion`;
         }
-        
+
         const form = new FormData();
         form.append('avatar_image', fs.createReadStream(req.file.path), {
             filename: req.file.originalname,
             contentType: req.file.mimetype
         });
         form.append('clothing_prompt', finalPrompt);
-        
+
         const response = await axios({
             method: 'post',
             url: 'https://try-on-diffusion.p.rapidapi.com/try-on-file',
@@ -60,13 +60,12 @@ app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => 
             },
             responseType: 'arraybuffer'
         });
-        
+
         res.set('Content-Type', 'image/jpeg');
         res.send(response.data);
         fs.unlink(req.file.path, () => {});
-        
     } catch (error) {
-        console.error(error);
+        console.error('❌ Error:', error.message);
         res.status(500).send(error.message);
     }
 });
@@ -74,4 +73,6 @@ app.post('/generate-outfit', upload.single('avatar_image'), async (req, res) => 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
+    console.log(`✅ /health - OK`);
+    console.log(`✅ /generate-outfit - Ready`);
 });
